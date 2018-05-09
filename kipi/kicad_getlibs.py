@@ -173,9 +173,10 @@ def get_app_config_path (appname):
         from AppKit import NSSearchPathForDirectoriesInDomains
         # http://developer.apple.com/DOCUMENTATION/Cocoa/Reference/Foundation/Miscellaneous/Foundation_Functions/Reference/reference.html#//apple_ref/c/func/NSSearchPathForDirectoriesInDomains
         # NSApplicationSupportDirectory = 14
+        # NSLibraryDirectory = 5
         # NSUserDomainMask = 1
         # True for expanding the tilde into a fully qualified path
-        appdata = os.path.join(NSSearchPathForDirectoriesInDomains(14, 1, True)[0], appname)
+        appdata = os.path.join(NSSearchPathForDirectoriesInDomains(5, 1, True)[0], "Preferences" , appname)
     elif sys.platform == 'win32':
         appdata = os.path.join(os.environ['APPDATA'], appname)
     else:
@@ -361,14 +362,14 @@ def get_zip (zip_url, target_path, checksum):
 # functions calling external git
 #
 def git_check ():
-    cmd = ["git", "version"]
+    cmd = ["git"]
 
     p = Popen(cmd, shell=True, stdout=subprocess.PIPE)
     out, err = p.communicate()
     #print (p.returncode, out, err)
     lines = out.split('\n')
 
-    if out.startswith ("git version"):
+    if out.startswith ("usage: git"):
         return True
     else:
         # print ("Warning : git is not installed!")
@@ -1036,15 +1037,9 @@ def get_filename_without_extension (file_path):
 
 def is_writable (folder):
     if os.access(folder, os.W_OK | os.X_OK):
-        try:
-            filename = os.path.join (folder, "_temp.txt")
-            f = open(filename, 'w' )
-            f.close()
-            os.remove(filename)
-            return True
-        except OSError as e:
-            print (e)
-            return False
+        return True
+    else:
+        return False
 
 
 def get_libs (target_path, file_spec, afilter, find_dirs):
@@ -1162,16 +1157,19 @@ def install_content (paths, target_path, atype, afilter, publisher, package_name
             # 
             # make_folder (ki_packages3d_dir)
             ok = False
-            if os.path.exists (paths.ki_packages3d_dir):
-                if is_writable (paths.ki_packages3d_dir):
-                    ok = True
-                else:
-                    print ("error: can't write to %s" % paths.ki_packages3d_dir)
+            if paths.ki_packages3d_dir == None:
+                print ("error: paths.ki_packages3d_dir is not set")
             else:
-                if make_folder (paths.ki_packages3d_dir):
-                    ok = True
+                if os.path.exists (paths.ki_packages3d_dir):
+                    if is_writable (paths.ki_packages3d_dir):
+                        ok = True
+                    else:
+                        print ("error: can't write to %s" % paths.ki_packages3d_dir)
                 else:
-                    print ("error: can't create %s" % paths.ki_packages3d_dir)
+                    if make_folder (paths.ki_packages3d_dir):
+                        ok = True
+                    else:
+                        print ("error: can't create %s" % paths.ki_packages3d_dir)
 
             if ok:
                 files = copy_files2(target_path, libs, paths.ki_packages3d_dir, dest_names, existing_files)
@@ -1478,7 +1476,10 @@ class Kipi():
 
                 installed_content = {}
                 installed_content ['name'] = content['name'] 
-                installed_content ['type'] = content['type'] 
+                try:
+                    installed_content ['type'] = content['type'] 
+                except:
+                    pass
                 installed_content ['files'] = files_to_install
                 if git_path:
                     installed_content ['git_repo'] = git_path
@@ -1892,7 +1893,10 @@ class Kipi():
 
 
         self.paths.cache_dir = self.config['cache_path']
-        self.default_package_file = self.config ['default_package']
+        try:
+            self.default_package_file = self.config ['default_package']
+        except:
+            pass
 
         self.paths.package_info_dir = os.path.join (self.paths.cache_dir, "_packages")
 
@@ -1902,12 +1906,13 @@ class Kipi():
         self.paths.kicad_config_dir = get_app_config_path("kicad")
 
         #todo: get from config
+
         kicad_common = read_config_file (os.path.join (self.paths.kicad_config_dir, "kicad_common"))
 
         if 'KIGITHUB' in os.environ:
             self.paths.ki_github_url = os.environ['KIGITHUB']
         else:
-            self.paths.ki_github_url = get_config_item (kicad_common, 'KIGITHUB')
+           self.paths.ki_github_url = get_config_item (kicad_common, 'KIGITHUB')
 
         if 'KISYS3DMOD' in os.environ:
             self.paths.ki_packages3d_dir = os.environ['KISYS3DMOD']
@@ -1919,8 +1924,8 @@ class Kipi():
 
         if 'KICAD_PTEMPLATES' in os.environ:
             self.paths.ki_portable_templates_dir = os.environ['KICAD_PTEMPLATES']
-        else:
-            self.paths.ki_portable_templates_dir = get_config_item (kicad_common, 'KICAD_PTEMPLATES')
+        #else:
+        #    self.paths.ki_portable_templates_dir = get_config_item (kicad_common, 'KICAD_PTEMPLATES')
 
         self.paths.ki_user_scripts_dir = os.path.join(self.paths.kicad_config_dir, "scripting")
 
